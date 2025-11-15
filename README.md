@@ -320,9 +320,10 @@ docker exec gdal-toolbox python3 /workspaces/gdal-docker/outputs/analyse_stats.p
 
 **Ibrahimakhalil Mbacke**  
 Maîtrise en Géomatique - UQAM  
-Email: [votre-email]  
+Email: [ibrahimakhalilmbacke2000@gmail.com]  
 GitHub: [@ibrahimakhalil2701](https://github.com/ibrahimakhalil2701)  
-LinkedIn: [Votre profil LinkedIn]
+LinkedIn: [www.linkedin.com/in/
+ibrahimakhalil-mbacke-692452204]
 
 ---
 
