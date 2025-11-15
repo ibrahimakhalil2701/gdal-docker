@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  gdal:
+    build: .
+    container_name: gdal-toolbox
+    working_dir: /data
+    volumes:
+      - ./data:/data
+    stdin_open: true
+    tty: true
