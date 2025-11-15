@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Analyse Réseau Cyclable Montréal - 500m des Parcs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        .info {
+            padding: 10px 15px;
+            background: white;
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            max-width: 320px;
+        }
+        .info h4 {
+            margin: 0 0 10px;
+            color: #2c5f2d;
+        }
+        .info p {
+            margin: 5px 0;
+            font-size: 13px;
+        }
+        .legend {
+            line-height: 20px;
+            color: #555;
+            font-size: 12px;
+        }
+        .legend i {
+            width: 25px;
+            height: 3px;
+            float: left;
+            margin-right: 8px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([45.52, -73.62], 11);
+        
+        // Fonds de carte
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        });
+        
+        var cartoDB = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap, © CartoDB',
+            maxZoom: 18
+        });
+        
+        osm.addTo(map);
+        
+        var info = L.control({position: 'topright'});
+        info.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info');
+            this.update();
+            return this._div;
+        };
+        info.update = function (props) {
+            this._div.innerHTML = '<h4>🚴 Réseau Cyclable Montréal</h4>' +
+                '<p><strong>Analyse:</strong> Pistes à moins de 500m des parcs</p>' +
+                '<p><strong>Total:</strong> ~957 km de pistes</p>' +
+                (props ? 
+                    '<hr><p><strong>Type:</strong> ' + (props.TYPE_VOIE_DESC || 'N/A') + '</p>' +
+                    '<p><strong>Longueur:</strong> ' + (props.LONGUEUR ? (props.LONGUEUR/1000).toFixed(2) + ' km' : 'N/A') + '</p>' +
+                    '<p><strong>Arrondissement:</strong> ' + (props.NOM_ARR_VILLE_DESC || 'N/A') + '</p>'
+                : '<p><i>Survolez une piste cyclable</i></p>');
+        };
+        info.addTo(map);
+        
+        var legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'info legend');
+            div.innerHTML = '<h4>Type de voie</h4>' +
+                '<i style="background: #1f78b4"></i> Piste en site propre<br>' +
+                '<i style="background: #33a02c"></i> Bande cyclable<br>' +
+                '<i style="background: #ff7f00"></i> Piste sur rue<br>' +
+                '<i style="background: #e31a1c"></i> Chaussée désignée<br>' +
+                '<i style="background: #6a3d9a"></i> Sentier polyvalent<br>' +
+                '<i style="background: #ffff99"></i> Vélorue<br>' +
+                '<i style="background: #b15928"></i> Voie Bus-Vélo<br>' +
+                '<i style="background: #fdbf6f"></i> Piste au trottoir';
+            return div;
+        };
+        legend.addTo(map);
+        
+        function getColor(type) {
+            if (!type) return '#999999';
+            if (type.includes('site propre')) return '#1f78b4';
+            if (type.includes('Bande')) return '#33a02c';
+            if (type.includes('sur rue')) return '#ff7f00';
+            if (type.includes('Chaussée')) return '#e31a1c';
+            if (type.includes('Sentier')) return '#6a3d9a';
+            if (type.includes('Vélorue')) return '#ffff99';
+            if (type.includes('Bus-Vélo')) return '#b15928';
+            if (type.includes('trottoir')) return '#fdbf6f';
+            return '#999999';
+        }
+        
+        function style(feature) {
+            return {
+                color: getColor(feature.properties.TYPE_VOIE_DESC),
+                weight: 3,
+                opacity: 0.8
+            };
+        }
+        
+        function highlightFeature(e) {
+            var layer = e.target;
+            layer.setStyle({
+                weight: 5,
+                opacity: 1
+            });
+            info.update(layer.feature.properties);
+        }
+        
+        function resetHighlight(e) {
+            geojsonLayer.resetStyle(e.target);
+            info.update();
+        }
+        
+        function onEachFeature(feature, layer) {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight
+            });
+        }
+        
+        // Charger le buffer fusionné
+        var bufferLayer;
+        fetch('data/buffer_fusionne.json')
+            .then(response => response.json())
+            .then(data => {
+                bufferLayer = L.geoJSON(data, {
+                    style: {
+                        color: '#27ae60',
+                        weight: 2,
+                        opacity: 0.6,
+                        fillColor: '#2ecc71',
+                        fillOpacity: 0.1
+                    }
+                });
+            })
+            .catch(error => console.log('Buffer fusionné non chargé'));
+        
+        // Charger le réseau cyclable
+        var geojsonLayer;
+        fetch('data/analyse_velo_mtl.json')
+            .then(response => response.json())
+            .then(data => {
+                geojsonLayer = L.geoJSON(data, {
+                    style: style,
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+                
+                map.fitBounds(geojsonLayer.getBounds());
+                
+                // Ajouter le contrôle de couches
+                var baseMaps = {
+                    "OpenStreetMap": osm,
+                    "CartoDB Light": cartoDB
+                };
+                
+                var overlayMaps = {
+                    "🚴 Pistes cyclables": geojsonLayer,
+                    "🟢 Zones 500m (fusionnées)": bufferLayer
+                };
+                
+                L.control.layers(baseMaps, overlayMaps, {
+                    position: 'topleft',
+                    collapsed: false
+                }).addTo(map);
+            })
+            .catch(error => {
+                console.error('Erreur chargement GeoJSON:', error);
+                alert('Erreur: Impossible de charger les données.');
+            });
+    </script>
+</body>
+</html>

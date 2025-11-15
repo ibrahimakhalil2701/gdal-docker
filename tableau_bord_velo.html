@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Analyse Réseau Cyclable - Vélo Québec</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        #map { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            bottom: 0; 
+            width: 65%; 
+        }
+        
+        #sidebar { 
+            position: fixed; 
+            top: 0; 
+            right: 0; 
+            bottom: 0; 
+            width: 35%; 
+            background: #f5f7fa;
+            overflow-y: auto;
+            padding: 25px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c5f2d 0%, #3d7e3f 100%);
+            color: white;
+            padding: 20px;
+            margin: -25px -25px 20px -25px;
+            border-radius: 0 0 15px 15px;
+        }
+        
+        .header h1 {
+            font-size: 22px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .kpi-card {
+            background: white;
+            padding: 18px;
+            border-radius: 10px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+            border-left: 4px solid #1f78b4;
+        }
+        
+        .kpi-card.warning {
+            border-left-color: #e74c3c;
+        }
+        
+        .kpi-card.success {
+            border-left-color: #27ae60;
+        }
+        
+        .kpi-title {
+            font-size: 11px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+        
+        .kpi-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 3px;
+        }
+        
+        .kpi-label {
+            font-size: 11px;
+            color: #95a5a6;
+        }
+        
+        .chart-container {
+            background: white;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+        }
+        
+        .chart-container h3 {
+            font-size: 14px;
+            color: #2c5f2d;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .table-stats {
+            width: 100%;
+            font-size: 12px;
+        }
+        
+        .table-stats th {
+            text-align: left;
+            padding: 8px 5px;
+            border-bottom: 2px solid #ecf0f1;
+            color: #7f8c8d;
+            font-weight: 600;
+            font-size: 11px;
+        }
+        
+        .table-stats td {
+            padding: 8px 5px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .progress-bar {
+            background: #ecf0f1;
+            height: 6px;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 3px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            transition: width 0.3s;
+        }
+        
+        .metadata {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 11px;
+            color: #7f8c8d;
+            margin-top: 15px;
+        }
+        
+        .metadata strong {
+            color: #2c3e50;
+        }
+        
+        .info {
+            padding: 12px 15px;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 8px;
+            max-width: 280px;
+            font-size: 12px;
+        }
+        
+        .info h4 {
+            margin: 0 0 10px;
+            color: #2c5f2d;
+            font-size: 14px;
+        }
+        
+        .info p {
+            margin: 4px 0;
+        }
+        
+        .legend {
+            line-height: 22px;
+            font-size: 11px;
+        }
+        
+        .legend i {
+            width: 20px;
+            height: 3px;
+            float: left;
+            margin-right: 8px;
+            margin-top: 9px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="sidebar">
+        <div class="header">
+            <h1>🚴 Réseau Cyclable Montréal</h1>
+            <p>Analyse d'accessibilité des parcs (rayon 500m)</p>
+        </div>
+        
+        <div class="kpi-grid">
+            <div class="kpi-card success">
+                <div class="kpi-title">Linéaire Total</div>
+                <div class="kpi-value">968 km</div>
+                <div class="kpi-label">Pistes près des parcs</div>
+            </div>
+            
+            <div class="kpi-card">
+                <div class="kpi-title">Segments</div>
+                <div class="kpi-value">8,300</div>
+                <div class="kpi-label">Tronçons analysés</div>
+            </div>
+            
+            <div class="kpi-card warning">
+                <div class="kpi-title">Taux de Sécurité</div>
+                <div class="kpi-value">16.9%</div>
+                <div class="kpi-label">Pistes en site propre</div>
+            </div>
+            
+            <div class="kpi-card">
+                <div class="kpi-title">Parcs Desservis</div>
+                <div class="kpi-value">2,239</div>
+                <div class="kpi-label">Espaces verts analysés</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h3>📊 Répartition par Type de Voie</h3>
+            <canvas id="chartType" height="180"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <h3>🏆 Top 5 Arrondissements (km)</h3>
+            <table class="table-stats">
+                <tr>
+                    <th>Arrondissement</th>
+                    <th style="text-align: right;">km</th>
+                    <th style="width: 30%;"></th>
+                </tr>
+                <tr>
+                    <td>RDP–Pointe-aux-Trembles</td>
+                    <td style="text-align: right;"><strong>96.7</strong></td>
+                    <td><div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div></td>
+                </tr>
+                <tr>
+                    <td>Rosemont–La Petite-Patrie</td>
+                    <td style="text-align: right;"><strong>84.5</strong></td>
+                    <td><div class="progress-bar"><div class="progress-fill" style="width: 87%;"></div></div></td>
+                </tr>
+                <tr>
+                    <td>Mercier–Hochelaga</td>
+                    <td style="text-align: right;"><strong>79.6</strong></td>
+                    <td><div class="progress-bar"><div class="progress-fill" style="width: 82%;"></div></div></td>
+                </tr>
+                <tr>
+                    <td>Ahuntsic-Cartierville</td>
+                    <td style="text-align: right;"><strong>73.6</strong></td>
+                    <td><div class="progress-bar"><div class="progress-fill" style="width: 76%;"></div></div></td>
+                </tr>
+                <tr>
+                    <td>Saint-Laurent</td>
+                    <td style="text-align: right;"><strong>72.7</strong></td>
+                    <td><div class="progress-bar"><div class="progress-fill" style="width: 75%;"></div></div></td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="chart-container">
+            <h3>⚠️ Enjeux Identifiés</h3>
+            <ul style="list-style: none; padding: 0; margin: 0; font-size: 12px; line-height: 1.8;">
+                <li>🔴 <strong>63.1%</strong> du réseau partage la chaussée avec les autos</li>
+                <li>🟡 <strong>Plateau & Ville-Marie</strong> sous-desservis vs densité</li>
+                <li>🟢 <strong>Sentiers polyvalents</strong> : 97.8 km (bon pour loisirs)</li>
+            </ul>
+        </div>
+        
+        <div class="metadata">
+            <strong>Métadonnées Géospatiales</strong><br>
+            <strong>Source:</strong> Données ouvertes Montréal (Nov 2025)<br>
+            <strong>Projection:</strong> WGS84 → MTM8 (EPSG:32188)<br>
+            <strong>Analyse:</strong> GDAL 3.9 + SQLite Spatial<br>
+            <strong>Buffer:</strong> ST_Buffer(geom, 500m)<br>
+            <strong>Intersection:</strong> ST_Intersects (PostGIS)<br>
+            <strong>Précision:</strong> ±5m (GPS standard)
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script>
+        // CARTE
+        var map = L.map('map').setView([45.52, -73.62], 11);
+        
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+        
+        var cartoDB = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© CartoDB'
+        });
+        
+        // Info box
+        var info = L.control({position: 'topright'});
+        info.onAdd = function() {
+            this._div = L.DomUtil.create('div', 'info');
+            this.update();
+            return this._div;
+        };
+        info.update = function(props) {
+            this._div.innerHTML = '<h4>🚴 Info Piste</h4>' +
+                (props ? 
+                    '<p><strong>Type:</strong> ' + props.TYPE_VOIE_DESC + '</p>' +
+                    '<p><strong>Longueur:</strong> ' + (props.LONGUEUR/1000).toFixed(2) + ' km</p>' +
+                    '<p><strong>Arrond.:</strong> ' + (props.NOM_ARR_VILLE_DESC || 'N/A') + '</p>' +
+                    '<p><strong>Séparateur:</strong> ' + (props.SEPARATEUR_DESC || 'Aucun') + '</p>'
+                : '<p><i>Survolez une piste</i></p>');
+        };
+        info.addTo(map);
+        
+        // Légende
+        var legend = L.control({position: 'bottomright'});
+        legend.onAdd = function() {
+            var div = L.DomUtil.create('div', 'info legend');
+            div.innerHTML = '<h4 style="margin:0 0 10px; font-size: 13px;">Type de voie</h4>' +
+                '<i style="background: #1f78b4"></i> Piste site propre<br>' +
+                '<i style="background: #33a02c"></i> Bande cyclable<br>' +
+                '<i style="background: #ff7f00"></i> Piste sur rue<br>' +
+                '<i style="background: #e31a1c"></i> Chaussée désignée<br>' +
+                '<i style="background: #6a3d9a"></i> Sentier polyvalent<br>' +
+                '<i style="background: #ffff99"></i> Vélorue<br>' +
+                '<i style="background: #b15928"></i> Voie Bus-Vélo<br>' +
+                '<i style="background: #fdbf6f"></i> Piste trottoir';
+            return div;
+        };
+        legend.addTo(map);
+        
+        function getColor(type) {
+            if (!type) return '#999';
+            if (type.includes('site propre')) return '#1f78b4';
+            if (type.includes('Bande')) return '#33a02c';
+            if (type.includes('sur rue')) return '#ff7f00';
+            if (type.includes('Chaussée')) return '#e31a1c';
+            if (type.includes('Sentier')) return '#6a3d9a';
+            if (type.includes('Vélorue')) return '#ffff99';
+            if (type.includes('Bus-Vélo')) return '#b15928';
+            if (type.includes('trottoir')) return '#fdbf6f';
+            return '#999';
+        }
+        
+        function style(feature) {
+            return {
+                color: getColor(feature.properties.TYPE_VOIE_DESC),
+                weight: 3,
+                opacity: 0.8
+            };
+        }
+        
+        function highlightFeature(e) {
+            e.target.setStyle({ weight: 5, opacity: 1 });
+            info.update(e.target.feature.properties);
+        }
+        
+        function resetHighlight(e) {
+            geojsonLayer.resetStyle(e.target);
+            info.update();
+        }
+        
+        function onEachFeature(feature, layer) {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight
+            });
+        }
+        
+        // Charger buffer fusionné
+        var bufferLayer;
+        fetch('data/buffer_fusionne.json')
+            .then(r => r.json())
+            .then(data => {
+                bufferLayer = L.geoJSON(data, {
+                    style: {
+                        color: '#27ae60',
+                        weight: 2,
+                        opacity: 0.5,
+                        fillOpacity: 0.08
+                    }
+                });
+            });
+        
+        // Charger pistes
+        var geojsonLayer;
+        fetch('data/analyse_velo_mtl.json')
+            .then(r => r.json())
+            .then(data => {
+                geojsonLayer = L.geoJSON(data, {
+                    style: style,
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+                
+                map.fitBounds(geojsonLayer.getBounds());
+                
+                // Contrôle couches
+                L.control.layers(
+                    {'OpenStreetMap': osm, 'CartoDB Light': cartoDB},
+                    {'🚴 Pistes cyclables': geojsonLayer, '🟢 Zones 500m': bufferLayer},
+                    {position: 'topleft', collapsed: false}
+                ).addTo(map);
+            });
+        
+        // GRAPHIQUE
+        new Chart(document.getElementById('chartType'), {
+            type: 'bar',
+            data: {
+                labels: ['Bande', 'Chaussée', 'Sur rue', 'Site propre', 'Sentier', 'Bus-Vélo', 'Trottoir', 'Vélorue'],
+                datasets: [{
+                    label: 'Kilomètres',
+                    data: [256.6, 224.2, 199.0, 163.4, 97.8, 11.2, 8.2, 8.0],
+                    backgroundColor: ['#33a02c', '#e31a1c', '#ff7f00', '#1f78b4', '#6a3d9a', '#b15928', '#fdbf6f', '#ffff99'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { 
+                        beginAtZero: true,
+                        title: { display: true, text: 'Kilomètres' }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
